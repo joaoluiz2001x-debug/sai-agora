@@ -7,6 +7,8 @@ import { Pressable, ScrollView, Switch, View } from 'react-native';
 import { colors } from '../theme';
 import { EnterUp, Icon, PressableScale, T, s } from '../components/ui';
 import { LegSummary } from '../components/TransitUI';
+import { FlipTime } from '../components/Board';
+import { font } from '../theme';
 import { Plan, Trip, countdown, hhmm } from '../lib/plan';
 import type { Alert } from '../data/carris';
 import { affects } from './Alerts';
@@ -29,44 +31,45 @@ function TripCard({ trip, plan, error, notify, onNotify, onDelete, onOpen, alert
 }) {
   const st = plan ? STATE[plan.state] : STATE.perdido;
   return (
-    <EnterUp deps={[plan?.it.id]} style={[s.card, { padding: 0, overflow: 'hidden' }]}>
+    <EnterUp deps={[plan?.it.id]} style={[s.card, { padding: 0, overflow: 'hidden', borderWidth: 0 }]}>
       <Pressable onPress={plan ? onOpen : undefined} accessibilityRole="button"
         accessibilityLabel={plan ? `${trip.label}. Saia de casa ${plan.state === 'saia' ? 'agora' : 'daqui a ' + countdown(plan.secondsToLeave)}. Chega às ${hhmm(plan.it.end)}. Ver caminho no mapa.` : trip.label}
-        style={({ pressed }) => ({ padding: 18, gap: 10, backgroundColor: pressed ? colors.cardOn : colors.card })}>
+        style={({ pressed }) => ({ padding: 18, gap: 14, backgroundColor: pressed ? colors.boardTile : colors.board })}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <T bold accessibilityRole="header" style={{ fontSize: 22 }}>{trip.label}</T>
+          <View style={{ flex: 1 }}>
+            <T style={{ fontFamily: font.mono, fontSize: 12, letterSpacing: 2.4, color: colors.amber } as any}>PARTIDA</T>
+            <T bold accessibilityRole="header" style={{ fontSize: 22, color: colors.boardInk }} numberOfLines={1}>{trip.label}</T>
+          </View>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: st.bg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 }}>
             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: st.dot }} />
-            <T bold style={{ color: st.ink, fontSize: 16 }}>{st.label}</T>
+            <T bold style={{ color: st.ink, fontSize: 15 }}>{st.label}</T>
           </View>
         </View>
-        <T style={{ fontSize: 16, color: colors.muted }} numberOfLines={1}>{trip.from.label} → {trip.to.label}</T>
 
         {!!alerts.length && (
           <Pressable onPress={onAlerts} accessibilityRole="button" accessibilityLabel={`Aviso: ${alerts[0].title}. Ver avisos`}
-            style={{ flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: '#FDE8E8', borderRadius: 10, padding: 10 }}>
-            <Icon name="warn" size={20} color="#8A1414" />
-            <T bold style={{ color: '#8A1414', fontSize: 15, flex: 1 }} numberOfLines={2}>{alerts[0].title}</T>
+            style={{ flexDirection: 'row', gap: 8, alignItems: 'center', backgroundColor: colors.amber, borderRadius: 10, padding: 10 }}>
+            <Icon name="warn" size={20} color={colors.onAmber} />
+            <T bold style={{ color: colors.onAmber, fontSize: 15, flex: 1 }} numberOfLines={2}>{alerts[0].title}</T>
           </Pressable>
         )}
 
-        {plan === undefined && !error && <T style={{ color: colors.muted }}>A calcular o caminho…</T>}
-        {error && <T style={{ color: colors.inkSoft }}>Sem ligação à internet para calcular o caminho.</T>}
-        {plan === null && <T style={{ fontSize: 18, color: colors.inkSoft }}>Não há transportes nas próximas horas.</T>}
+        {plan === undefined && !error && <T style={{ color: colors.boardMuted }}>A calcular o caminho…</T>}
+        {error && <T style={{ color: colors.boardMuted }}>Sem ligação à internet para calcular o caminho.</T>}
+        {plan === null && <T style={{ fontSize: 18, color: colors.boardInk }}>Não há transportes nas próximas horas.</T>}
         {plan && (
           <>
-            <View>
-              <T style={{ fontSize: 18, color: colors.inkSoft }}>{plan.state === 'saia' ? 'Saia de casa' : 'Saia de casa daqui a'}</T>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
-                <T bold style={{ fontSize: 56, lineHeight: 64, color: plan.state === 'saia' ? colors.emergency : colors.ink }}>{countdown(plan.secondsToLeave)}</T>
-                <T style={{ fontSize: 18, color: colors.inkSoft }}>às {hhmm(plan.leaveAt)}</T>
-              </View>
+            <View style={{ gap: 6 }}>
+              <T style={{ fontSize: 16, color: colors.boardMuted }}>{plan.state === 'saia' ? 'Saia de casa agora' : `Saia de casa às ${hhmm(plan.leaveAt)} — faltam`}</T>
+              {plan.state === 'saia'
+                ? <T style={{ fontFamily: font.monoBold, fontSize: 44, color: colors.amber } as any}>JÁ!</T>
+                : <FlipTime seconds={plan.secondsToLeave} size={42} />}
             </View>
-            <LegSummary it={plan.it} />
+            <View style={{ backgroundColor: colors.card, borderRadius: 12, padding: 10 }}><LegSummary it={plan.it} /></View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <T style={{ fontSize: 17 }}>Chega às <T bold style={{ fontSize: 17 }}>{hhmm(plan.it.end)}</T></T>
+              <T style={{ fontSize: 17, color: colors.boardInk }}>Chega às <T style={{ fontFamily: font.monoBold, fontSize: 17, color: colors.boardInk } as any}>{hhmm(plan.it.end)}</T></T>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <T bold style={{ color: colors.brand }}>Ver no mapa</T><Icon name="chevron" size={18} color={colors.brand} />
+                <T bold style={{ color: colors.amber }}>Ver no mapa</T><Icon name="chevron" size={18} color={colors.amber} />
               </View>
             </View>
           </>
@@ -98,8 +101,8 @@ export function Home(props: {
     <ScrollView style={{ flex: 1, backgroundColor: colors.ground }} contentContainerStyle={{ padding: 20, paddingTop: 60, paddingBottom: 32, gap: 16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <View>
-          <T style={{ fontSize: 17, color: colors.muted }}>{greeting()}</T>
-          <T bold accessibilityRole="header" style={{ fontSize: 28 }}>As suas viagens</T>
+          <T style={{ fontFamily: font.mono, fontSize: 13, letterSpacing: 3, color: colors.brand } as any}>SAI AGORA · {greeting().toUpperCase()}</T>
+          <T bold accessibilityRole="header" style={{ fontSize: 30 }}>As suas partidas</T>
         </View>
         {props.trips.length > 0 && (
           <Pressable onPress={props.onSimple} accessibilityRole="button" accessibilityLabel="Abrir ecrã simples, com letras gigantes"
@@ -129,7 +132,7 @@ export function Home(props: {
       ))}
 
       {props.trips.length > 0 && (
-        <PressableScale accessibilityRole="button" onPress={props.onPlan} style={[s.ghostBtn, { minHeight: 56, borderWidth: 2, borderColor: colors.brand }]}>
+        <PressableScale accessibilityRole="button" onPress={props.onPlan} style={[s.ghostBtn, { minHeight: 56, borderWidth: 2, borderColor: colors.brand, borderStyle: 'dashed' }]}>
           <T bold style={{ color: colors.brand, fontSize: 18 }}>+ Nova viagem</T>
         </PressableScale>
       )}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Linking, Pressable, ScrollView, Switch, View } from 'react-native';
 import { colors } from '../theme';
 import { T, s } from '../components/ui';
 import type { Settings } from '../lib/plan';
@@ -43,6 +43,12 @@ export function SettingsScreen({ settings, onChange, onIntro }: { settings: Sett
         <T style={{ color: colors.inkSoft, lineHeight: 23 }}>
           Caminhos: Transitous (serviço comunitário, dados abertos de Metro, Carris, Carris Metropolitana, CP e outros). Tempo real e avisos: Carris Metropolitana (CC BY 4.0). Mapas: OpenFreeMap © OpenStreetMap. App independente, não oficial e de código aberto.
         </T>
+        <Pressable onPress={() => Linking.openURL('https://github.com/joaoluiz2001x-debug/sai-agora')} accessibilityRole="link" style={{ minHeight: 44, justifyContent: 'center' }}>
+          <T bold style={{ color: colors.brand }}>Código-fonte no GitHub (MIT)</T>
+        </Pressable>
+        <Pressable onPress={() => Linking.openURL('https://transitous.org/sources')} accessibilityRole="link" style={{ minHeight: 44, justifyContent: 'center' }}>
+          <T bold style={{ color: colors.brand }}>Fontes de dados do Transitous</T>
+        </Pressable>
         <Pressable onPress={onIntro} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
           <T bold style={{ color: colors.brand }}>Ver o ecrã de boas-vindas</T>
         </Pressable>

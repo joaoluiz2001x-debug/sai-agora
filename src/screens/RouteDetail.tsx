@@ -4,15 +4,24 @@ import { Linking, Pressable, ScrollView, useWindowDimensions, View } from 'react
 import { colors } from '../theme';
 import { EnterUp, Icon, PressableScale, T, s } from '../components/ui';
 import { RouteMap } from '../components/RouteMap';
+import { FlipTime } from '../components/Board';
+import { font } from '../theme';
+import { Navigate } from './Navigate';
 import { LineBadge, ModeIcon } from '../components/TransitUI';
-import { Itinerary, Leg, TRANSITOUS_SOURCES, enrichWithCarrisMetropolitana, leaveTime, lineName } from '../data/transit';
+import { Itinerary, Leg, TRANSITOUS_SOURCES, enrichWithCarrisMetropolitana, leaveTime, lineName, nextDepartures } from '../data/transit';
+import { Alert, fetchAlerts } from '../data/carris';
 import { countdown, hhmm } from '../lib/plan';
 
 const mins = (a: number, b: number) => Math.max(1, Math.round((b - a) / 60));
 
-function Step({ l, last, next }: { l: Leg; last: boolean; next?: Leg }) {
+function Step({ l, last, next, alerts }: { l: Leg; last: boolean; next?: Leg; alerts: Alert[] }) {
   const walk = l.mode === 'WALK';
   const dotColor = walk ? colors.lineStrong : l.color;
+  const [open, setOpen] = useState(false);
+  const [after, setAfter] = useState<{ at: number; realTime: boolean; delay: number }[]>([]);
+  useEffect(() => { if (!walk) nextDepartures(l).then(setAfter).catch(() => {}); }, [l.from.stopId, l.start]);
+  const delay = Math.round((l.start - l.scheduledStart) / 60);
+  const mine = walk ? [] : alerts.filter((a) => l.route && a.lines.includes(l.route));
   return (
     <View style={{ flexDirection: 'row', gap: 12 }}>
       <View style={{ alignItems: 'center', width: 32 }}>
@@ -39,11 +48,32 @@ function Step({ l, last, next }: { l: Leg; last: boolean; next?: Leg }) {
               Apanhe em <T bold style={{ fontSize: 16 }}>{l.from.name}</T> às <T bold style={{ fontSize: 16 }}>{hhmm(l.start)}</T>
             </T>
             <T style={{ fontSize: 14, color: l.realTime ? colors.fast : colors.muted }}>
-              {l.realTime ? '● Tempo real' : '○ Horário previsto'}{l.agency ? ` · ${l.mode === 'SUBWAY' ? lineName(l) + ' · ' : ''}${l.agency.replace(', E.P.E.', '')}` : ''}
+              {l.realTime ? (delay >= 2 ? `● Tempo real · ${delay} min atrasado` : delay <= -2 ? `● Tempo real · ${-delay} min adiantado` : '● Tempo real · a horas') : '○ Horário previsto'}{l.agency ? ` · ${l.mode === 'SUBWAY' ? lineName(l) + ' · ' : ''}${l.agency.replace(', E.P.E.', '')}` : ''}
             </T>
             <T style={{ fontSize: 16, color: colors.inkSoft }}>
               {l.stopsCount ? `${l.stopsCount} paragens · ` : ''}{mins(l.start, l.end)} min · saia em <T bold style={{ fontSize: 16 }}>{l.to.name}</T>
             </T>
+            {after.length > 0 && (
+              <T style={{ fontSize: 15, color: colors.inkSoft }}>Se perder este: <T bold style={{ fontSize: 15 }}>{after.map((x) => hhmm(x.at)).join(' · ')}</T></T>
+            )}
+            {mine.map((a) => (
+              <View key={a.id} style={{ backgroundColor: '#FEF3C7', borderRadius: 10, padding: 10, gap: 2 }}>
+                <T bold style={{ fontSize: 15, color: '#92400E' }}>⚠ {a.title}</T>
+                <T style={{ fontSize: 14, color: '#92400E' }} numberOfLines={3}>{a.text}</T>
+              </View>
+            ))}
+            {l.stops.length > 0 && (
+              <Pressable onPress={() => setOpen(!open)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ minHeight: 40, justifyContent: 'center' }}>
+                <T bold style={{ fontSize: 15, color: colors.brand }}>{open ? 'Esconder paragens' : `Ver as ${l.stops.length} paragens pelo caminho`}</T>
+              </Pressable>
+            )}
+            {open && l.stops.map((x, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 3 }}>
+                <View style={{ width: 9, height: 9, borderRadius: 5, borderWidth: 2, borderColor: l.color, backgroundColor: '#fff' }} />
+                <T style={{ flex: 1, fontSize: 15, color: colors.inkSoft }} numberOfLines={1}>{x.name}</T>
+                {!!x.at && <T style={{ fontSize: 14, color: colors.muted }}>{hhmm(x.at)}</T>}
+              </View>
+            ))}
             {next && next.mode !== 'WALK' && <T style={{ fontSize: 15, color: colors.brand }}>Mude logo para o seguinte.</T>}
           </>
         )}
@@ -61,6 +91,10 @@ export function RouteDetail({ itinerary, from, to, onBack, onSave, saved }: {
   useEffect(() => { setIt(itinerary); enrichWithCarrisMetropolitana(itinerary).then(setIt).catch(() => {}); }, [itinerary]);
   useEffect(() => { const id = setInterval(() => setNow(Date.now() / 1000), 1000); return () => clearInterval(id); }, []);
   const leave = leaveTime(it) - now;
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  useEffect(() => { fetchAlerts().then(setAlerts).catch(() => {}); }, []);
+  const [nav, setNav] = useState(false);
+  if (nav) return <Navigate itinerary={it} onEnd={() => setNav(false)} />;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.ground }}>
@@ -72,27 +106,31 @@ export function RouteDetail({ itinerary, from, to, onBack, onSave, saved }: {
 
       <ScrollView style={{ flex: 1, marginTop: -16, borderTopLeftRadius: 20, borderTopRightRadius: 20, backgroundColor: colors.ground }}
         contentContainerStyle={{ padding: 20, paddingBottom: 32, gap: 16 }}>
-        <EnterUp style={[s.card, { gap: 6 }]}>
-          <T style={{ fontSize: 16, color: colors.muted }} numberOfLines={1}>{from} → {to}</T>
-          <T style={{ fontSize: 18, color: colors.inkSoft }}>{leave <= 30 ? 'Saia de casa' : 'Saia de casa daqui a'}</T>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-            <T bold style={{ fontSize: 44, lineHeight: 52, color: leave <= 30 ? colors.emergency : colors.ink }}>{leave < -60 ? 'Já passou' : countdown(leave)}</T>
-            <T style={{ fontSize: 18, color: colors.inkSoft }}>às {hhmm(leaveTime(it))}</T>
-          </View>
-          <T style={{ fontSize: 18 }}>Chega às <T bold style={{ fontSize: 18 }}>{hhmm(it.end)}</T> · {Math.round(it.duration / 60)} min · {it.transfers ? `${it.transfers} transbordo${it.transfers > 1 ? 's' : ''}` : 'sem transbordos'}</T>
+        <EnterUp style={{ backgroundColor: colors.board, borderRadius: 20, padding: 18, gap: 8 }}>
+          <T style={{ fontFamily: font.mono, fontSize: 12, letterSpacing: 2.4, color: colors.amber } as any} numberOfLines={1}>{(from + ' → ' + to).toUpperCase()}</T>
+          <T style={{ fontSize: 16, color: colors.boardMuted }}>{leave <= 30 ? 'Saia de casa agora' : `Saia de casa às ${hhmm(leaveTime(it))} — faltam`}</T>
+          {leave < -60 ? <T style={{ fontFamily: font.monoBold, fontSize: 36, color: colors.amber } as any}>JÁ PASSOU</T>
+            : leave <= 30 ? <T style={{ fontFamily: font.monoBold, fontSize: 44, color: colors.amber } as any}>JÁ!</T>
+            : <FlipTime seconds={leave} size={40} />}
+          <T style={{ fontSize: 17, color: colors.boardInk }}>Chega às <T style={{ fontFamily: font.monoBold, fontSize: 17, color: colors.boardInk } as any}>{hhmm(it.end)}</T> · {Math.round(it.duration / 60)} min · {it.transfers ? `${it.transfers} transbordo${it.transfers > 1 ? 's' : ''}` : 'direto'}</T>
         </EnterUp>
 
         <View style={[s.card, { paddingBottom: 4 }]}>
-          {it.legs.map((l, i) => <Step key={i} l={l} last={i === it.legs.length - 1} next={it.legs[i + 1]} />)}
+          {it.legs.map((l, i) => <Step key={i} l={l} last={i === it.legs.length - 1} next={it.legs[i + 1]} alerts={alerts} />)}
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', paddingBottom: 12 }}>
             <View style={{ width: 32, alignItems: 'center' }}><Icon name="flag" color={colors.brand} /></View>
             <T bold style={{ fontSize: 18 }}>Chega a {to} às {hhmm(it.end)}</T>
           </View>
         </View>
 
+        <PressableScale accessibilityRole="button" onPress={() => setNav(true)} style={[s.primaryBtn, { minHeight: 56, flexDirection: 'row', gap: 10, backgroundColor: colors.amber }]}>
+          <Icon name="nav" color={colors.onAmber} />
+          <T bold style={{ color: colors.onAmber, fontSize: 18 }}>Iniciar viagem</T>
+        </PressableScale>
+
         {onSave && (
-          <PressableScale accessibilityRole="button" onPress={onSave} disabled={saved} style={[s.primaryBtn, { minHeight: 56, opacity: saved ? 0.6 : 1 }]}>
-            <T bold style={{ color: colors.onBrand, fontSize: 18 }}>{saved ? 'Guardada' : 'Guardar e avisar-me quando sair'}</T>
+          <PressableScale accessibilityRole="button" onPress={onSave} disabled={saved} style={[s.card, { minHeight: 56, alignItems: 'center', justifyContent: 'center', opacity: saved ? 0.6 : 1 }]}>
+            <T bold style={{ color: colors.brand, fontSize: 18 }}>{saved ? 'Guardada' : 'Guardar e avisar-me quando sair'}</T>
           </PressableScale>
         )}
 

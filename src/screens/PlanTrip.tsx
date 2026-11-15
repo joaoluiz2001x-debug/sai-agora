@@ -1,5 +1,6 @@
 /** "Para onde vai?" — origem e destino com sugestões; mostra viagens com transbordos (a pé, autocarro, metro…). */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { colors, font } from '../theme';
 import { EnterUp, Icon, PressableScale, T, s } from '../components/ui';
@@ -13,7 +14,8 @@ function Field({ id, label, icon, value, onChange, placeholder, onGps, picked, o
   id: string; label: string; icon: 'pin' | 'flag'; value: string; onChange: (v: string) => void; placeholder: string; onGps?: () => void;
   picked: Place | null; onPick: (p: Place) => void; stops: Stop[];
 }) {
-  const showSug = value.trim().length >= 2 && (!picked || picked.label !== value);
+  const [focused, setFocused] = useState(false);
+  const showSug = focused && value.trim().length >= 2 && (!picked || picked.label !== value);
   const [online, setOnline] = useState<Suggestion[]>([]);
   useEffect(() => {
     setOnline([]);
@@ -35,7 +37,7 @@ function Field({ id, label, icon, value, onChange, placeholder, onGps, picked, o
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 54, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 12, paddingHorizontal: 12, backgroundColor: colors.card }}>
           <Icon name={icon} size={20} color={colors.brand} />
-          <TextInput accessibilityLabelledBy={id} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={colors.muted}
+          <TextInput accessibilityLabelledBy={id} onFocus={() => setFocused(true)} onBlur={() => setTimeout(() => setFocused(false), 250)} value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={colors.muted}
             style={{ flex: 1, fontSize: 18, fontFamily: font.regular, color: colors.ink, minHeight: 50, outlineWidth: 0 } as any} />
         </View>
         {onGps && (
@@ -90,6 +92,39 @@ export function PlanTrip({ onOpen }: { onOpen: (it: Itinerary, from: Place, to: 
   useEffect(() => { const id = setInterval(() => setNow(Date.now() / 1000), 15000); return () => clearInterval(id); }, []);
   useEffect(() => { setIts(null); }, [toQ, fromQ]);
 
+  // Casa, Trabalho e destinos recentes (guardados só no telemóvel)
+  const [saved, setSaved] = useState<{ casa?: Place; trabalho?: Place; recent: Place[] }>({ recent: [] });
+  const [hint, setHint] = useState('');
+  useEffect(() => { AsyncStorage.getItem('saiagora:places').then((x) => x && setSaved({ recent: [], ...JSON.parse(x) })).catch(() => {}); }, []);
+  const store = (n: typeof saved) => { setSaved(n); AsyncStorage.setItem('saiagora:places', JSON.stringify(n)).catch(() => {}); };
+  const pickDest = (p: Place) => {
+    setDest(p); setToQ(p.label);
+    store({ ...saved, recent: [p, ...saved.recent.filter((r) => r.label !== p.label)].slice(0, 5) });
+  };
+  const shortcut = (k: 'casa' | 'trabalho') => {
+    const name = k === 'casa' ? 'Casa' : 'Trabalho';
+    const have = saved[k];
+    if (have) { pickDest({ ...have }); setHint(''); return; }
+    if (dest && toQ === dest.label) { store({ ...saved, [k]: dest }); setHint(`${name} guardado: ${dest.label}`); return; }
+    setHint(`Escolha primeiro um destino e depois toque em ${name} para o guardar.`);
+  };
+
+  // Partida = a minha localização, logo ao abrir
+  useEffect(() => {
+    currentPlace().then((p) => { if (p) { const me = { ...p, label: 'A sua localização' }; setFrom((f) => f ?? me); setFromQ((q) => q || me.label); } }).catch(() => {});
+  }, []);
+  const swap = () => { const f = from, fq = fromQ; setFrom(dest); setFromQ(toQ); setDest(f); setToQ(fq); };
+
+  // Pesquisa sozinha quando os dois locais estão escolhidos
+  const auto = useRef('');
+  useEffect(() => {
+    if (!from || !dest || fromQ !== from.label || toQ !== dest.label) return;
+    const k = `${from.lat},${from.lon}>${dest.lat},${dest.lon}`;
+    if (auto.current === k) return;
+    auto.current = k;
+    search();
+  }, [from, dest, fromQ, toQ]);
+
   const gps = async () => {
     const p = await currentPlace();
     if (p) { setFrom(p); setFromQ(p.label); } else setErr('Não foi possível obter a localização. Escreva a rua ou zona de partida.');
@@ -116,13 +151,43 @@ export function PlanTrip({ onOpen }: { onOpen: (it: Itinerary, from: Place, to: 
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: colors.ground }} contentContainerStyle={{ padding: 20, paddingTop: 60, paddingBottom: 40, gap: 16 }} keyboardShouldPersistTaps="handled">
-      <T bold accessibilityRole="header" style={{ fontSize: 28 }}>Para onde vai?</T>
+      <T style={{ fontFamily: font.mono, fontSize: 13, letterSpacing: 3, color: colors.brand } as any}>NOVA PARTIDA</T>
+      <T bold accessibilityRole="header" style={{ fontSize: 30, marginTop: -10 }}>Para onde vai?</T>
 
       <View style={[s.card, { gap: 14 }]}>
         <Field id="from" label="Sai de" icon="pin" value={fromQ} onChange={(v) => { setFromQ(v); if (from && v !== from.label) setFrom(null); }}
           placeholder="Rua, número ou zona" onGps={gps} picked={from} onPick={(p) => { setFrom(p); setFromQ(p.label); }} stops={stops} />
+        <Pressable onPress={swap} accessibilityRole="button" accessibilityLabel="Trocar partida e destino"
+          style={{ alignSelf: 'flex-end', marginVertical: -10, width: 44, height: 44, borderRadius: 22, backgroundColor: colors.cardOn, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="swap" size={20} color={colors.brand} />
+        </Pressable>
         <Field id="to" label="Vai para" icon="flag" value={toQ} onChange={(v) => { setToQ(v); if (dest && v !== dest.label) setDest(null); }}
-          placeholder="Rua, número, zona ou local" picked={dest} onPick={(p) => { setDest(p); setToQ(p.label); }} stops={stops} />
+          placeholder="Rua, número, zona ou local" picked={dest} onPick={pickDest} stops={stops} />
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {(['casa', 'trabalho'] as const).map((k) => (
+            <Pressable key={k} onPress={() => shortcut(k)} accessibilityRole="button"
+              accessibilityLabel={saved[k] ? `Ir para ${k}: ${saved[k]!.label}` : `Guardar ${k}`}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44, paddingHorizontal: 14, borderRadius: 22, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card }}>
+              <Icon name={k === 'casa' ? 'home' : 'route'} size={18} color={colors.brand} />
+              <View>
+                <T bold style={{ fontSize: 15 }}>{k === 'casa' ? 'Casa' : 'Trabalho'}</T>
+                <T style={{ fontSize: 12, color: colors.muted, maxWidth: 120 }} numberOfLines={1}>{saved[k]?.label ?? 'Definir'}</T>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+        {!!hint && <T style={{ fontSize: 14, color: colors.inkSoft }}>{hint}</T>}
+        {!toQ && saved.recent.length > 0 && (
+          <View style={{ gap: 2 }}>
+            <T bold style={{ fontSize: 14, color: colors.muted }}>Recentes</T>
+            {saved.recent.map((r) => (
+              <Pressable key={r.label} onPress={() => pickDest(r)} accessibilityRole="button" style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Icon name="clock" size={18} color={colors.muted} />
+                <T style={{ fontSize: 17, flex: 1 }} numberOfLines={1}>{r.label}</T>
+              </Pressable>
+            ))}
+          </View>
+        )}
         <PressableScale accessibilityRole="button" onPress={search} disabled={busy} style={[s.primaryBtn, { minHeight: 56 }]}>
           {busy ? <ActivityIndicator color={colors.onBrand} /> : <T bold style={{ color: colors.onBrand, fontSize: 18 }}>Ver caminhos</T>}
         </PressableScale>
@@ -145,8 +210,8 @@ export function PlanTrip({ onOpen }: { onOpen: (it: Itinerary, from: Place, to: 
               style={({ pressed }) => [s.card, { gap: 12, backgroundColor: pressed ? colors.cardOn : colors.card, borderWidth: i === 0 ? 2 : 1, borderColor: i === 0 ? colors.brand : colors.line }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                 <View style={{ gap: 2 }}>
-                  {i === 0 && <T bold style={{ fontSize: 13, color: colors.brand }}>CHEGA MAIS CEDO</T>}
-                  <T bold style={{ fontSize: 22 }}>{hhmm(leaveTime(it))} – {hhmm(it.end)}</T>
+                  {i === 0 && <View style={{ alignSelf: 'flex-start', backgroundColor: colors.amber, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}><T style={{ fontFamily: font.mono, fontSize: 12, letterSpacing: 1.5, color: colors.onAmber } as any}>CHEGA MAIS CEDO</T></View>}
+                  <T style={{ fontFamily: font.monoBold, fontSize: 22, color: colors.ink } as any}>{hhmm(leaveTime(it))} → {hhmm(it.end)}</T>
                   <T style={{ fontSize: 15, color: colors.muted }}>{Math.round(it.duration / 60)} min · {it.transfers ? `${it.transfers} transbordo${it.transfers > 1 ? 's' : ''}` : 'direto'}</T>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
