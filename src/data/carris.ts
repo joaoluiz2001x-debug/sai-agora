@@ -221,3 +221,15 @@ export function searchStopNames(stops: Stop[], q: string, n = 6): { label: strin
   }
   return [...seen.values()].sort((a, b) => a.score - b.score || a.label.length - b.label.length).slice(0, n);
 }
+
+export type Vehicle = { id: string; line: string; lat: number; lon: number; bearing: number; tripId: string };
+/** Autocarros da Carris Metropolitana em tempo real (posição GPS), só das linhas pedidas. */
+export async function fetchVehicles(lines: string[]): Promise<Vehicle[]> {
+  if (!lines.length) return [];
+  const r = await fetch(`${BASE}/vehicles`);
+  if (!r.ok) return [];
+  const all: any[] = await r.json();
+  return all
+    .filter((v) => lines.includes(clean(String(v.line_id))) && typeof v.lat === 'number')
+    .map((v) => ({ id: String(v.id), line: clean(String(v.line_id)), lat: v.lat, lon: v.lon, bearing: v.bearing ?? 0, tripId: String(v.trip_id ?? '') }));
+}

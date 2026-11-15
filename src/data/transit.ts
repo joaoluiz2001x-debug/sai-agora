@@ -31,6 +31,8 @@ export type Leg = {
   headsign?: string;
   agency?: string;
   stopsCount?: number;
+  /** Paragens intermédias (onde o autocarro para pelo caminho), com hora prevista. */
+  stops: (Point & { name: string; at: number })[];
   path: Point[];
   streets: string[]; // ruas do percurso a pé
 };
@@ -103,6 +105,7 @@ export async function planTrip(from: Point, to: Point, names: { from: string; to
         distance: l.distance, route: l.routeShortName || l.displayName, routeLong: l.routeLongName,
         color, textColor: l.routeTextColor ? '#' + l.routeTextColor : '#FFFFFF',
         headsign: l.headsign, agency: l.agencyName, stopsCount: l.intermediateStops ? l.intermediateStops.length + 1 : undefined,
+        stops: (l.intermediateStops ?? []).filter((x: any) => typeof x.lat === 'number').map((x: any) => ({ lat: x.lat, lon: x.lon, name: x.name ?? '', at: t(x.arrival ?? x.departure ?? x.scheduledArrival) })),
         path: l.legGeometry?.points ? decodePolyline(l.legGeometry.points, l.legGeometry.precision ?? 7) : [l.from, l.to],
         streets: [...new Set<string>((l.steps ?? []).map((s: any) => s.streetName).filter((x: string) => x && x.length > 2))].slice(0, 3),
       };
@@ -147,4 +150,18 @@ export function lineName(l: Leg) {
 /** Hora a que tem de sair de casa = início da 1.ª perna (a pé). */
 export function leaveTime(it: Itinerary) {
   return it.legs[0]?.start ?? it.start;
+}
+
+/** Próximas partidas da mesma linha e sentido na paragem de embarque (para quem perde o autocarro). */
+export async function nextDepartures(l: Leg, n = 3): Promise<{ at: number; realTime: boolean; delay: number }[]> {
+  if (l.mode === 'WALK' || !l.from.stopId) return [];
+  const r = await fetch(`${TRANSITOUS_BASE}/stoptimes?stopId=${encodeURIComponent(l.from.stopId)}&n=80&time=${new Date((l.start - 60) * 1000).toISOString()}`,
+    Platform.OS === 'web' ? undefined : { headers: { 'User-Agent': USER_AGENT } });
+  if (!r.ok) return [];
+  const j = await r.json();
+  return (j.stopTimes ?? [])
+    .filter((x: any) => (x.routeShortName ?? x.displayName) === l.route && (!l.headsign || x.headsign === l.headsign))
+    .map((x: any) => ({ at: t(x.place.departure), realTime: !!x.realTime, delay: t(x.place.departure) - t(x.place.scheduledDeparture) }))
+    .filter((x: any) => x.at > l.start + 30)
+    .slice(0, n);
 }
