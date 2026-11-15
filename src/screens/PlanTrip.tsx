@@ -8,7 +8,7 @@ import { Stop, distanceM, fetchStops } from '../data/carris';
 import { PLACE_SUGGESTIONS, Place, Suggestion, currentPlace, looksLikeStreet, resolvePlace, searchPlacesLocal, searchPlacesOnline } from '../data/places';
 import { Itinerary, leaveTime, planTrip } from '../data/transit';
 import { LegSummary } from '../components/TransitUI';
-import { countdown, hhmm } from '../lib/plan';
+import { countdown, hhmm, score } from '../lib/plan';
 
 function Field({ id, label, icon, value, onChange, placeholder, onGps, picked, onPick, stops }: {
   id: string; label: string; icon: 'pin' | 'flag'; value: string; onChange: (v: string) => void; placeholder: string; onGps?: () => void;
@@ -130,6 +130,18 @@ export function PlanTrip({ onOpen }: { onOpen: (it: Itinerary, from: Place, to: 
     if (p) { setFrom(p); setFromQ(p.label); } else setErr('Não foi possível obter a localização. Escreva a rua ou zona de partida.');
   };
 
+  // Etiquetas: melhor opção (chegada + transbordos), a que chega mais cedo e a com menos transbordos
+  const tags = (it: Itinerary, i: number) => {
+    if (!its) return [];
+    const t: string[] = [];
+    if (i === 0) t.push('MELHOR OPÇÃO');
+    const minEnd = Math.min(...its.map((x) => x.end));
+    const minTr = Math.min(...its.map((x) => x.transfers));
+    if (it.end === minEnd && its.findIndex((x) => x.end === minEnd) === i) t.push('CHEGA MAIS CEDO');
+    if (it.transfers === minTr && its.findIndex((x) => x.transfers === minTr) === i && i !== 0) t.push(minTr === 0 ? 'DIRETO' : 'MENOS TRANSBORDOS');
+    return t;
+  };
+
   const search = async () => {
     setErr(''); setIts(null); setBusy(true);
     try {
@@ -141,7 +153,7 @@ export function PlanTrip({ onOpen }: { onOpen: (it: Itinerary, from: Place, to: 
       if (distanceM(a, b) < 400) { setErr('O destino fica muito perto — é melhor ir a pé.'); return; }
       const r = await planTrip(a, b, { from: a.label, to: b.label });
       // Pequena correção: ordenar pela hora de chegada.
-      setIts(r.sort((x, y) => x.end - y.end));
+      setIts(r.sort((x, y) => score(x) - score(y)));
     } catch {
       setErr(Platform.OS === 'web' && /claude|claudeusercontent/.test(String(globalThis.location?.host)) ?
         'No preview do Claude não há internet. Abra o site publicado ou a app para ver viagens.' :
@@ -210,7 +222,10 @@ export function PlanTrip({ onOpen }: { onOpen: (it: Itinerary, from: Place, to: 
               style={({ pressed }) => [s.card, { gap: 12, backgroundColor: pressed ? colors.cardOn : colors.card, borderWidth: i === 0 ? 2 : 1, borderColor: i === 0 ? colors.brand : colors.line }]}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
                 <View style={{ gap: 2 }}>
-                  {i === 0 && <View style={{ alignSelf: 'flex-start', backgroundColor: colors.amber, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}><T style={{ fontFamily: font.mono, fontSize: 12, letterSpacing: 1.5, color: colors.onAmber } as any}>CHEGA MAIS CEDO</T></View>}
+                  {tags(it, i).length > 0 && <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>{tags(it, i).map((t) => (
+                  <View key={t} style={{ backgroundColor: t === 'MELHOR OPÇÃO' ? colors.amber : colors.cardOn, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                    <T style={{ fontFamily: font.mono, fontSize: 12, letterSpacing: 1.5, color: t === 'MELHOR OPÇÃO' ? colors.onAmber : colors.brand } as any}>{t}</T>
+                  </View>))}</View>}
                   <T style={{ fontFamily: font.monoBold, fontSize: 22, color: colors.ink } as any}>{hhmm(leaveTime(it))} → {hhmm(it.end)}</T>
                   <T style={{ fontSize: 15, color: colors.muted }}>{Math.round(it.duration / 60)} min · {it.transfers ? `${it.transfers} transbordo${it.transfers > 1 ? 's' : ''}` : 'direto'}</T>
                 </View>

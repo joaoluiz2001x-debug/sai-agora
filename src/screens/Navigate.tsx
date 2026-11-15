@@ -147,7 +147,7 @@ export function Navigate({ itinerary, onEnd }: { itinerary: Itinerary; onEnd: ()
   const next = itinerary.legs[li + 1];
   const left = where && where.leg === li ? where.left : leg.distance ?? 0;
   const offRoute = !!where && where.d > 80;
-  const sheet = 150;
+  const sheet = 200;
   // Já dentro do transporte? Pela posição (se já avançou na linha) ou pela hora
   const riding = leg.mode !== 'WALK' && ((!!where && where.leg === li && where.idx > 1) || now >= leg.start);
   const stopIdx = useMemo(() => leg.stops.map((x) => leg.path.reduce((bi, p, i) => (dist(p, x) < dist(leg.path[bi], x) ? i : bi), 0)), [leg]);
@@ -181,14 +181,12 @@ export function Navigate({ itinerary, onEnd }: { itinerary: Itinerary; onEnd: ()
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24,
         padding: 18, paddingBottom: 26, gap: 12, boxShadow: '0 -4px 16px rgba(0,0,0,.12)' } as any}>
         <View style={{ alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.line }} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ flex: 1 }}>
-            <T bold style={{ fontSize: 26 }}>{Math.max(1, Math.round((itinerary.end - now) / 60))} min</T>
-            <T style={{ color: colors.inkSoft }}>Chegada às {hhmm(itinerary.end)}</T>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
-            {itinerary.legs.filter((l) => l.mode !== 'WALK').map((l, i) => <LineBadge key={i} leg={l} />)}
-          </View>
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <T bold style={{ fontSize: 26 }}>{Math.max(1, Math.round((itinerary.end - now) / 60))} min</T>
+          <T style={{ color: colors.inkSoft, fontSize: 16 }}>Chegada às {hhmm(itinerary.end)}</T>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
+          {itinerary.legs.filter((l) => l.mode !== 'WALK').map((l, i) => <LineBadge key={i} leg={l} />)}
         </View>
         {denied && <T style={{ color: colors.emergency }}>Sem acesso à localização: ative-a para o boneco andar no mapa.</T>}
         <View style={{ flexDirection: 'row', gap: 10 }}>
