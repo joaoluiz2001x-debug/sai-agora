@@ -6,7 +6,7 @@ rm -rf dist
 EXPO_OFFLINE=1 CI=1 npx expo export --platform web --output-dir dist
 cd dist
 mkdir -p assets/fonts
-for f in $(find assets/node_modules -name "*.ttf" | grep -E "(Atkinson.*(400Regular|700Bold)\.|JetBrainsMono_(400Regular|700Bold)\.)"); do cp "$f" assets/fonts/; done
+for f in $(find assets/node_modules -name "*.ttf" | grep -E "(Atkinson.*(400Regular|700Bold)\.|JetBrainsMono_(500Medium|800ExtraBold)\.)"); do cp "$f" assets/fonts/; done
 rm -rf assets/node_modules
 JS=$(ls _expo/static/js/web/*.js)
 sed -i -E 's#"/assets/node_modules/@expo-google-fonts/[^/]+/[^/]+/#"./assets/fonts/#g' "$JS"
