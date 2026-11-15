@@ -11,8 +11,13 @@ export type Trip = { id: string; label: string; from: Place; to: Place };
 export type Plan = { it: Itinerary; leaveAt: number; secondsToLeave: number; state: 'cedo' | 'prepare' | 'saia' };
 
 /** Primeira viagem que ainda dá para apanhar (sair no máximo há 30 s). */
+/** Pontuação para ordenar viagens: hora de chegada + 6 min por cada transbordo.
+ * Assim uma viagem com 4 transbordos só ganha a uma com 2 se chegar bem mais cedo (mais de 12 min). */
+export const TRANSFER_PENALTY = 6 * 60;
+export function score(it: Itinerary) { return it.end + it.transfers * TRANSFER_PENALTY; }
+
 export function pickPlan(its: Itinerary[], nowS = Date.now() / 1000): Plan | null {
-  const ok = its.filter((it) => leaveTime(it) >= nowS - 30).sort((a, b) => a.end - b.end || leaveTime(a) - leaveTime(b));
+  const ok = its.filter((it) => leaveTime(it) >= nowS - 30).sort((a, b) => score(a) - score(b) || leaveTime(b) - leaveTime(a));
   const it = ok[0];
   if (!it) return null;
   const leaveAt = leaveTime(it);
