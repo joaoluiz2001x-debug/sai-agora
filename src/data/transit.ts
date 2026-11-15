@@ -81,7 +81,7 @@ export async function planTrip(from: Point, to: Point, names: { from: string; to
   const q = new URLSearchParams({
     fromPlace: `${from.lat.toFixed(5)},${from.lon.toFixed(5)}`,
     toPlace: `${to.lat.toFixed(5)},${to.lon.toFixed(5)}`,
-    numItineraries: '5',
+    numItineraries: '8',
     detailedTransfers: 'true',
   });
   if (opts.time) q.set('time', opts.time.toISOString());
@@ -97,7 +97,9 @@ export async function planTrip(from: Point, to: Point, names: { from: string; to
     id: it.id ?? `${it.startTime}-${it.endTime}`,
     start: t(it.startTime), end: t(it.endTime), duration: it.duration, transfers: it.transfers ?? 0,
     legs: (it.legs ?? []).map((l: any): Leg => {
-      const mode = (['WALK', 'BUS', 'SUBWAY', 'TRAM', 'RAIL', 'FERRY', 'FUNICULAR'].includes(l.mode) ? l.mode : l.mode === 'METRO' ? 'SUBWAY' : l.mode?.includes('RAIL') ? 'RAIL' : 'OTHER') as Mode;
+      // A CP publica as linhas suburbanas (Sintra, Azambuja, Cascais…) como METRO: são comboios
+      const train = /CP - Comboios|Fertagus/i.test(l.agencyName ?? '');
+      const mode = (train && l.mode !== 'WALK' && l.mode !== 'BUS' ? 'RAIL' : ['WALK', 'BUS', 'SUBWAY', 'TRAM', 'RAIL', 'FERRY', 'FUNICULAR'].includes(l.mode) ? l.mode : l.mode === 'METRO' ? 'SUBWAY' : l.mode?.includes('RAIL') ? 'RAIL' : 'OTHER') as Mode;
       const color = l.routeColor ? '#' + l.routeColor : MODE_COLOR[mode] ?? '#374151';
       return {
         mode, from: stop(l.from, null, names), to: stop(l.to, null, names),
