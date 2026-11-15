@@ -8,7 +8,7 @@ import type { RouteMapProps } from './RouteMap';
 
 export type { RouteMapProps };
 
-export function RouteMap({ itinerary, me, height }: RouteMapProps) {
+export function RouteMap({ itinerary, me, follow, height }: RouteMapProps) {
   const ref = useRef<MapView>(null);
   useEffect(() => {
     const pts = itinerary.legs.flatMap((l) => l.path.map((p) => ({ latitude: p.lat, longitude: p.lon })));
@@ -18,12 +18,12 @@ export function RouteMap({ itinerary, me, height }: RouteMapProps) {
   const first = itinerary.legs[0].from;
   const last = itinerary.legs[itinerary.legs.length - 1].to;
   return (
-    <View style={{ height }}>
-      <MapView ref={ref} style={{ flex: 1 }} showsUserLocation={!!me} toolbarEnabled={false}
+    <View style={{ height: height as any }}>
+      <MapView ref={ref} style={{ flex: 1 }} showsUserLocation={!!me || !!follow} followsUserLocation={!!follow} showsBuildings pitchEnabled toolbarEnabled={false}
         initialRegion={{ latitude: first.lat, longitude: first.lon, latitudeDelta: 0.05, longitudeDelta: 0.05 }}>
         {itinerary.legs.map((l, i) => (
           <Polyline key={i} coordinates={l.path.map((p) => ({ latitude: p.lat, longitude: p.lon }))}
-            strokeColor={l.mode === 'WALK' ? '#4B5563' : l.color} strokeWidth={l.mode === 'WALK' ? 4 : 6}
+            strokeColor={l.mode === 'WALK' ? '#1A73E8' : l.color} strokeWidth={l.mode === 'WALK' ? 5 : 8}
             lineDashPattern={l.mode === 'WALK' ? [2, 8] : undefined} />
         ))}
         {itinerary.legs.filter((l) => l.mode !== 'WALK').map((l, i) => (
