@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import { useFonts, AtkinsonHyperlegible_400Regular, AtkinsonHyperlegible_700Bold } from '@expo-google-fonts/atkinson-hyperlegible';
+import { JetBrainsMono_500Medium, JetBrainsMono_800ExtraBold } from '@expo-google-fonts/jetbrains-mono';
 import { colors } from './src/theme';
 import { Intro } from './src/screens/Intro';
 import { Home } from './src/screens/Home';
@@ -34,7 +35,7 @@ async function load(): Promise<Saved> {
 }
 
 export default function App() {
-  const [fontsLoaded] = useFonts({ AtkinsonHyperlegible_400Regular, AtkinsonHyperlegible_700Bold });
+  const [fontsLoaded] = useFonts({ AtkinsonHyperlegible_400Regular, AtkinsonHyperlegible_700Bold, JetBrainsMono_500Medium, JetBrainsMono_800ExtraBold });
   const [ready, setReady] = useState(false);
   const [trips, setTrips] = useState<Trip[]>([]);
   const [notify, setNotify] = useState<Record<string, boolean>>({});
