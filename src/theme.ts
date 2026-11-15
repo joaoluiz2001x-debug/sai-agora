@@ -1,17 +1,24 @@
 // Design tokens (ui-ux-pro-max: flat, high contrast, Atkinson Hyperlegible).
 export const colors = {
-  // Tema claro, sóbrio, de serviço público (sem identidade visual oficial do SNS).
-  brand: '#0A5BA8',
-  brandDark: '#08467F',
+  // Conceito "Painel de partidas": azul-noite dos painéis das estações + amarelo elétrico de Lisboa.
+  brand: '#14306B',
+  brandDark: '#0B1A3C',
   onBrand: '#FFFFFF',
+  board: '#0B1A3C',
+  boardTile: '#162B57',
+  boardLine: '#24407A',
+  boardInk: '#E8EEFA',
+  boardMuted: '#9FB0D4',
+  amber: '#FFC72C',
+  onAmber: '#0B1A3C',
   ink: '#111827',
   inkSoft: '#374151',
   muted: '#4B5563',
-  ground: '#F3F5F8',
+  ground: '#F2EFE6',
   card: '#FFFFFF',
-  cardOn: '#E8F1FB',
+  cardOn: '#E9EDF7',
   inkOn: '#111827',
-  line: '#D9DEE5',
+  line: '#E0DBCD',
   lineStrong: '#B8C1CC',
   track: '#E5E9EF',
   dotted: '#9CA3AF',
@@ -35,8 +42,8 @@ export const colors = {
 export const font = {
   regular: 'AtkinsonHyperlegible_400Regular',
   bold: 'AtkinsonHyperlegible_700Bold',
-  mono: 'JetBrainsMono_400Regular',
-  monoBold: 'JetBrainsMono_700Bold',
+  mono: 'JetBrainsMono_500Medium',
+  monoBold: 'JetBrainsMono_800ExtraBold',
 };
 
 export const radius = { sm: 6, md: 12, lg: 16, xl: 20 };
